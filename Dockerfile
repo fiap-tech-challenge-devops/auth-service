@@ -1,4 +1,4 @@
-# ─── Stage 1: Build ─────────────────────────────────────────────────────────
+# Stage 1: Build
 FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
@@ -8,19 +8,20 @@ RUN go mod download
 
 COPY . .
 
-RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o auth-service .
+RUN go mod tidy && CGO_ENABLED=0 go build -o auth-service .
 
+# Stage 2: Runtime
 FROM alpine:3.19
 
 RUN apk --no-cache add ca-certificates wget
 
-RUN addgroup -S appgroup && adduser -S -u 10001 appuser -G appgroup
+RUN addgroup -S togglemastergroup && adduser -S -u 10001 togglemaster -G togglemastergroup
 
-WORKDIR /home/appuser
+WORKDIR /home/togglemaster
 
-COPY --from=builder --chown=appuser:appgroup /app/auth-service .
+COPY --from=builder --chown=togglemaster:togglemastergroup /app/auth-service .
 
-USER appuser
+USER togglemaster
 
 EXPOSE 8001
 
