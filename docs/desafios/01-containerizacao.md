@@ -366,3 +366,58 @@ Em um container Docker, o ambiente é **completamente limpo e determinístico**:
 1. **Commitar o `go.sum`:** Executar `go mod tidy` localmente e versionar o `go.sum` gerado. Isso torna o build mais rápido e remove a necessidade do `go mod tidy` no Dockerfile
 2. **Rodar `go build ./...` localmente antes de commitar:** Diferente de `go run .`, o `go build` aplica todas as validações estritas do compilador, incluindo imports não utilizados
 3. **Adicionar CI básico:** Uma pipeline que execute `go build ./...` e `go vet ./...` em cada push detectaria esses problemas automaticamente antes que chegassem ao processo de containerização
+
+---
+
+## Decisões de containerização (sem alteração de código)
+
+Registro de escolhas conscientes durante o MVP, para o relatório e para alinhar com deploy manual (sem CI por enquanto).
+
+### Decisão 1 — Não versionar `go.sum`; manter `go mod tidy` no Dockerfile
+
+**Contexto:** Em ambiente produtivo maduro, `go.mod` e `go.sum` costumam ir juntos no Git e o Dockerfile faz só `go mod download` + `go build`. Neste MVP, o repositório não commita `go.sum`.
+
+**Decisão:** Manter `go mod tidy` na etapa de build do Docker, após `COPY . .`, para gerar/atualizar o sum dentro do container limpo e permitir compilação a partir do código versionado, sem exigir `go mod tidy` na máquina do desenvolvedor antes de cada deploy.
+
+**Trade-off aceito:**
+
+- Build Docker um pouco mais lento quando a layer de código invalida (tidy em todo rebuild).
+- Menos alinhado ao fluxo “lockfile no Git” de produção plena.
+- Adequado para FIAP/MVP com deploy manual e dependências estáveis.
+
+**Alternativa não adotada:** Rodar `go mod tidy` localmente, commitar `go.sum` e remover o `tidy` do Dockerfile.
+
+---
+
+### Decisão 2 — Simplificação da linha de build no Dockerfile
+
+**Contexto:** A linha original usava flags extras no `go build`:
+
+```dockerfile
+RUN go mod tidy && CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o auth-service .
+```
+
+**Decisão:** Simplificar para:
+
+```dockerfile
+RUN go mod tidy && CGO_ENABLED=0 go build -o auth-service .
+```
+
+**O que foi removido e por quê:**
+
+| Flag removida | Motivo |
+|---------------|--------|
+| `GOOS=linux` | Redundante: o build já roda dentro de `golang:1.21-alpine` (Linux). |
+| `-a` | Rebuild forçado de todos os pacotes; desnecessário neste fluxo Docker. |
+| `-installsuffix cgo` | Legado com `CGO_ENABLED=0`; Go 1.21 não exige no nosso caso. |
+
+**O que foi mantido:**
+
+| Item | Motivo |
+|------|--------|
+| `go mod tidy` | Alinhado à Decisão 1 (sem `go.sum` no Git). |
+| `CGO_ENABLED=0` | Binário estático compatível com Alpine no stage final. |
+
+**Validação:** `docker compose build auth-service` e `GET /health` em `http://localhost:8001/health`.
+
+**Impacto no código da aplicação:** Nenhum. Alteração apenas no `Dockerfile`.
