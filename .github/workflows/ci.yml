@@ -1,6 +1,8 @@
 name: Auth Service CI
 
 on:
+  workflow_dispatch:
+
   pull_request:
     branches:
       - main
