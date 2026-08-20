@@ -12,6 +12,10 @@ on:
       - main
       - feature/ci-devsecops
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   ci:
     uses: fiap-tech-challenge-devops/reusable-workflows/.github/workflows/go-ci.yml@feature/ci-ecr
