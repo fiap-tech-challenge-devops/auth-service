@@ -28,7 +28,7 @@ Este é o serviço de autenticação do projeto ToggleMaster. Ele é responsáve
     PORT="8001"
     
     # Chave mestra para criar novas chaves de API
-    MASTER_KEY="admin-secreto-123"
+    MASTER_KEY="<defina-uma-chave-mestra>"
     ```
 
 4.  **Instale as Dependências:**
@@ -58,7 +58,7 @@ Saída esperada: `{"status":"ok"}`
 ```bash
 curl -X POST http://localhost:8001/admin/keys \
 -H "Content-Type: application/json" \
--H "Authorization: Bearer admin-secreto-123" \
+-H "Authorization: Bearer $MASTER_KEY" \
 -d '{"name": "meu-primeiro-servico"}'
 ``` 
 
@@ -67,7 +67,7 @@ Saída esperada (A SUA CHAVE SERÁ DIFERENTE):
 ```json
 {
   "name": "meu-primeiro-servico",
-  "key": "tm_key_a1b2c3d4...",
+  "key": "<sua-nova-chave>",
   "message": "Guarde esta chave com segurança! Você não poderá vê-la novamente."
 }
 ```
@@ -76,7 +76,7 @@ Saída esperada (A SUA CHAVE SERÁ DIFERENTE):
 
 ```bash
 curl http://localhost:8001/validate \
--H "Authorization: Bearer tm_key_a1b2c3d4..."
+-H "Authorization: Bearer $API_KEY"
 ```
 
 Saída esperada: `{"message":"Chave válida"}`
@@ -85,7 +85,7 @@ Saída esperada: `{"message":"Chave válida"}`
 
 ```bash
 curl http://localhost:8001/validate \
--H "Authorization: Bearer chave-errada-123"
+-H "Authorization: Bearer <chave-invalida>"
 ```
 
 Saída esperada: `Chave de API inválida ou inativa`
