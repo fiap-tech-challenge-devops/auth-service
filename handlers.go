@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 )
@@ -23,7 +23,7 @@ type CreateKeyResponse struct {
 func (a *App) healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]string{"status": "ok"}); err != nil {
-		log.Printf("Erro ao escrever resposta de health: %v", err)
+		slog.ErrorContext(r.Context(), "Erro ao escrever resposta de health", "erro", err)
 	}
 }
 
@@ -43,10 +43,10 @@ func (a *App) validateKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Verifica se o hash existe no banco de dados
 	var id int
-	err := a.DB.QueryRow("SELECT id FROM api_keys WHERE key_hash = $1 AND is_active = true", keyHash).Scan(&id)
+	err := a.DB.QueryRowContext(r.Context(), "SELECT id FROM api_keys WHERE key_hash = $1 AND is_active = true", keyHash).Scan(&id)
 	if err != nil {
 		// Se não encontrar (sql.ErrNoRows), ou qualquer outro erro, a chave é inválida
-		log.Printf("Falha na validação da chave (hash: %s...): %v", keyHash[:6], err)
+		slog.WarnContext(r.Context(), "Falha na validação da chave", "hash_prefixo", keyHash[:6], "erro", err)
 		http.Error(w, "Chave de API inválida ou inativa", http.StatusUnauthorized)
 		return
 	}
@@ -54,7 +54,7 @@ func (a *App) validateKeyHandler(w http.ResponseWriter, r *http.Request) {
 	// Chave válida
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(map[string]string{"message": "Chave válida"}); err != nil {
-		log.Printf("Erro ao escrever resposta de validacao: %v", err)
+		slog.ErrorContext(r.Context(), "Erro ao escrever resposta de validacao", "erro", err)
 	}
 }
 
@@ -86,13 +86,13 @@ func (a *App) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Salva o hash no banco de dados
 	var newID int
-	err = a.DB.QueryRow(
+	err = a.DB.QueryRowContext(r.Context(),
 		"INSERT INTO api_keys (name, key_hash) VALUES ($1, $2) RETURNING id",
 		req.Name, newKeyHash,
 	).Scan(&newID)
 
 	if err != nil {
-		log.Printf("Erro ao salvar a chave no banco: %v", err)
+		slog.ErrorContext(r.Context(), "Erro ao salvar a chave no banco", "erro", err)
 		http.Error(w, "Erro ao salvar a chave", http.StatusInternalServerError)
 		return
 	}
@@ -103,11 +103,11 @@ func (a *App) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		Key:     newKey, // Retorna a chave em texto plano pela última vez
 		Message: "Guarde esta chave com segurança! Você não poderá vê-la novamente.",
 	}); err != nil {
-		log.Printf("ERRO: chave %d criada no banco mas nao entregue ao cliente: %v", newID, err)
+		slog.ErrorContext(r.Context(), "Chave criada no banco mas nao entregue ao cliente", "id", newID, "erro", err)
 		return
 	}
 
-	log.Printf("Nova chave criada com sucesso (ID: %d, Name: %s)", newID, req.Name)
+	slog.InfoContext(r.Context(), "Nova chave criada com sucesso", "id", newID, "nome", req.Name)
 }
 
 // --- Middleware ---
