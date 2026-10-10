@@ -1,0 +1,7 @@
+# Binarios do build local
+auth-service
+auth-service.exe
+
+# Variaveis locais
+.env
+*.env
